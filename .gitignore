@@ -1,7 +1,7 @@
-.ToMODAPI_models/
+ToMODAPI_models/
 .DS_Store
-.DS_Store/
+DS_Store/
 **/DS_Store/
 **/DS_Store
-.__pycache__/
+__pycache__/
 **/__pycache__/
