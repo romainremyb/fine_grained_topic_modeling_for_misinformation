@@ -1,0 +1,11 @@
+-model	LFLDA
+-corpus	/Users/pasquale/git/tomodapi/models/lftm/LFLDA.glove
+-vectors	/Users/pasquale/git/tomodapi/tomodapi/glove/glove.6B.50d.txt
+-ntopics	20
+-alpha	0.1
+-beta	0.1
+-lambda	1.0
+-initers	50
+-niters	5
+-twords	10
+-name	LFLDA

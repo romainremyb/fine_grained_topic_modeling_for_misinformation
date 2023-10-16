@@ -1,5 +1,4 @@
 tqdm
 rdflib
-requests
-tomodapi
+SPARQLWrapper
 
