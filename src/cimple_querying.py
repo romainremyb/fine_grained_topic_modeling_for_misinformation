@@ -46,7 +46,7 @@ def get_all_statements_with_predicate(wrapper, predicate):
 def get_all_subjects_objects_pairs_from_property_and_subject(wrapper, subject, property):
   query = """
     SELECT ?subject ?object
-    WHERE {
+    WHERE |
     ?subject <{}> ?object .
        ?subject a schema:{} .
     ¨
