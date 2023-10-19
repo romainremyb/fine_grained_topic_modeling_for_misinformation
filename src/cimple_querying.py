@@ -92,6 +92,7 @@ class localGraph:
     """
     triples=self.g.triples((None, None, None))
     return set([s[1] for s in triples])
+  
 
     
   def get_unique_predicates_for_recordType(self, recordtype, as_subject=True): 
@@ -100,14 +101,15 @@ class localGraph:
     
     : param recordtype:  -> self.prefix_namespaces[prefix] + recordtype (e.g. NewsArticle)
     """
-    if as_subject==True:
-      triples=self.g.triples((URIRef(recordtype), None, None))
-    else:
-      triples=self.g.triples((None, None, URIRef(recordtype)))
-    predicates=[]
+    type_uris = self.get_unique_uris_from_type_statement(recordtype)
+    triples=self.g.triples((None, None, None))
+    predicates=set()
     for s in triples:
-      if s[1] not in predicates:
-        predicates.append(s[1])
+      if as_subject==True and s[0] in type_uris and s[0] not in predicates:
+        predicates.add(s[1])
+      if as_subject==False and s[2] in type_uris and s[2] not in predicates:
+        predicates.add(s[1])
+
     return predicates
     
     
