@@ -2,9 +2,7 @@ import sys, os
 import json
 from collections import defaultdict
 from rdflib import Graph, Literal, URIRef
-
-
-sys.path.append(os.path.expanduser("~")+'/Desktop/topic_modeling/fine_grained_topic_modeling_for_misinformation/src/')
+import csv
 from cimple_querying import localGraph
 
 
@@ -12,7 +10,6 @@ cimple = localGraph('KGs_v6/')
 
 uris_in_namespaces, unique_uris_in_namespaces = cimple.get_full_namespace_dict()
 
-import csv
 os.chdir(os.path.expanduser("~")+'/Desktop/topic_modeling/fine_grained_topic_modeling_for_misinformation/ToMODAPI_data/')
 
 type_statements = cimple.get_all_triples_from_predicate(URIRef('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'))
@@ -30,7 +27,7 @@ for uri in twitts.keys():
     twitter_data['id_doc'].append(str(uri).rsplit('/', 1)[-1])
     twitter_data['content'].append(str(twitts[uri]))
 
-with open('twitts.csv', 'w', newline='') as file:
+with open(str(os.getcwd()).rsplit('/', 1)[0]+'/data/twitts.csv', 'w', newline='') as file:
     writer = csv.writer(file, quoting=csv.QUOTE_ALL, quotechar='"')
     writer.writerow(twitter_data.keys())
     writer.writerows(zip(*twitter_data.values()))
@@ -43,7 +40,7 @@ for uri in afp.keys():
     afp_data['id_doc'].append(str(uri).rsplit('/', 1)[-1])
     afp_data['content'].append(str(afp[uri]))
 
-with open('afp.csv', 'w', newline='') as file:
+with open(str(os.getcwd()).rsplit('/', 1)[0]+'/data/afp.csv', 'w', newline='') as file:
     writer = csv.writer(file, quoting=csv.QUOTE_ALL, quotechar='"')
     writer.writerow(afp_data.keys())
     writer.writerows(zip(*afp_data.values()))
