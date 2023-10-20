@@ -1,0 +1,9 @@
+ToMODAPI_models/
+data/
+.DS_Store
+DS_Store/
+**/DS_Store/
+**/DS_Store
+__pycache__/
+**/__pycache__/
+KGs_v6/
