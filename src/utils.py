@@ -75,6 +75,8 @@ def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=
     :param bool add_adj_nn_pairs: extract adjective/noun pairs. Append them to result
         NOTE: this implementation keeps adjs and nouns as sole items in final list
               could be implemented with either nltk or spacy
+
+    TODO: control verbs and adjectives
     """
     global init_done
 
@@ -98,10 +100,10 @@ def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=
 
     lem = nltk.stem.WordNetLemmatizer()
 
-    if add_JJ_NN_pairs_nltk:
+    if add_adj_nn_pairs:
         adj_noun_pairs = add_JJ_NN_pairs_nltk(text, lem) #merge adjectives ?
 
-    text = pos_and_lemma(text, lem, adjectives=False)
+    text = pos_and_lemma(text, lem, verbs=True, adjectives=False) 
 
     text = [w for w in text if w not in nltk.corpus.stopwords.words('english')]
 
@@ -117,12 +119,16 @@ def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=
     return text
 
 
-def pos_and_lemma(tokens, lem, adjectives=False):
+def pos_and_lemma(tokens, lem, verbs=True, adjectives=False):
     # nltk pos tags: https://www.guru99.com/pos-tagging-chunking-nltk.html
     # lem.lemmatize(i,j) -> j: POS tag. Valid options are `"n"` for nouns,`"v"` for verbs, `"a"` for adjectives, `"r"` for adverbs and `"s"` for satellite adjectives.
     result=[]
+    if verbs==True:
+        check=['n','v']
+    else:
+        check=['n']
     for i, j in pos_tag(tokens):
-        if j[0].lower() in ['n','v']:
+        if j[0].lower() in check:
             result.append(lem.lemmatize(i, j[0].lower()))
         if adjectives==True and j[0].lower()=='j':
             result.append(lem.lemmatize(i, 'a'))
@@ -136,7 +142,7 @@ def add_JJ_NN_pairs_nltk(tokens, lem):
         word, pos = pos_tagged[i]
         next_word, next_pos = pos_tagged[i + 1]
         if pos.startswith('JJ') and next_pos.startswith('NN'):
-            adj_noun_pairs.append(lem.lemmatize(word,'a') + next_word)
+            adj_noun_pairs.append(lem.lemmatize(word,'a') + lem.lemmatize(next_word,'a'))
     return adj_noun_pairs
 
 
@@ -146,5 +152,5 @@ def add_JJ_NN_pairs_spacy(text, lem):
     doc = nlp(text)
     for token in doc:
         if token.pos_ == "ADJ" and token.head.pos_ == "NOUN":
-            adj_noun_pairs.append(token.text + ' ' + token.head.text)
+            adj_noun_pairs.append(lem.lemmatize(token.text ,'a') + lem.lemmatize(token.head.text,'a'))
     return adj_noun_pairs
