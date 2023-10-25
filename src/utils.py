@@ -3,6 +3,8 @@ import nltk
 from nltk import pos_tag
 import sys
 import spacy
+from gensim.corpora import Dictionary
+import numpy as np
 
 
 init_done = False
@@ -12,11 +14,58 @@ unicodes_to_remove = ['\\u2015', '\\u2033', '\\u2063', '\\u0627',
  '\\u2018', '\\u2014', '\\u2022', '\\u201d', '\\u201c', '\\u2019']
 
 
+experiment_result = {
+    'number_topics': None, #int, None if infered ex: HDP
+    'hyperparameters': {},
+    'doc_topic_pvalues': { # get for all above or filter in range ?
+        '0.30': [], #list of ids
+        '0.50': [], 
+        '0.60': [], 
+        '0.75': [], 
+        '0.90': [], 
+        '0.95': [], 
+        '0.95': [], 
+    },
+    'word_topic_pvalues': {}, #{topic, [words]},...  gives N words per topics 
+    'coherence_metrics': {
+
+    }
+}
+
+
 def is_list_of_strings(lst):
     return bool(lst) and isinstance(lst, list) and all(isinstance(elem, str) for elem in lst)
 
 
-def preprocess_for_latent_distribs(data, preprocessing=False, return_idxs=False):
+#TODO: add wordName/id dictionary ?
+def preprocess_for_bow(data, return_idxs=True, preprocessing=True, preproc_params=
+                       {'keep_unicodes': {'keep': True, 'min_count_in_corpus': 2},
+                        'strip_brackets': False, 'add_adj_nn_pairs': True, 'verbs': True, 
+                        'adjectives': False}): 
+    """
+    return Dict with keys: 
+        - data as list of text docs
+        - ids if flagged
+        - data as list of documents - made up of list of tokens
+        - dictionary of tokens
+        - bag of words (ids pointing to dictionary)
+
+    :param data: .csv | .txt path (.txt treating lines as text doc only) | list of docs
+    :param bool return_idxs: whether to print indexes or not (note empty docs are removed)
+    :param bool preprocessing
+    :param dict preproc_params
+        preproc_params.keep_unicodes.keep: set True to keep them in BOW - modifying unicodes_to_remove is recommanded
+        preproc_params.keep_unicodes.min_count_in_corpus: checks counts of unicodes in corpus and 
+                            remove unicodes with count < min_count_in_corpus 
+                            (e.g. setting as 2 will remove unicodes of frequency one)
+        preproc_params.strip_brackets: remove from bow what is inside brackets
+        preproc_params.add_adj_nn_pairs: whether to add adj/noun pairs to BOW (keeps them as sole items)
+        preproc_params.verbs: whether to keep verbs (identified by pos) in bow
+        add_adj_nn_pairs.adjectives: whether to keep adjectives (identified by pos) in bow
+            note: adverbs, prepositions etc not retrieved
+    """
+
+    finaldata=dict()
     if type(data) == str:
         try:
             if data[-4:]=='.csv':
@@ -27,6 +76,7 @@ def preprocess_for_latent_distribs(data, preprocessing=False, return_idxs=False)
                             text.append(line.rstrip().split('",',1)[-1][1:-1])
                             idxs.append(line.rstrip().split('",',1)[0][1:-1])
             elif data[-4:]=='.txt':
+                return_idxs=False #TODO: Log the fact that is is considering entire lines as text docs
                 with open(data, "r", encoding='utf-8') as datafile:
                     text = [line.rstrip() for line in datafile if line and len(line)!=0]
             else:
@@ -43,16 +93,34 @@ def preprocess_for_latent_distribs(data, preprocessing=False, return_idxs=False)
         raise ValueError('data should be a path or a list of strings')
     
     if preprocessing:
-        text = [preprocess(doc) for doc in text]
+        if preproc_params['keep_unicodes']['keep']==True:
+            unicodes_to_remove.extend(remove_unicodes_with_min_count(text, 
+                                preproc_params['keep_unicodes']['min_count_in_corpus']))
+            
+        text = [preprocess(doc, preproc_params['strip_brackets'], preproc_params['keep_unicodes']['keep'], 
+                           preproc_params['add_adj_nn_pairs'],  preproc_params['verbs'], 
+                           preproc_params['adjectives'], unicodes_to_remove) for doc in text]
     
     if return_idxs==True:
         try:
-            return text[1:], idxs[1:]
+            tokenized_data, dictionary, corpus = return_data(text[1:])
+            finaldata['text'], finaldata['ids'] = text[1:], idxs[1:]
+            finaldata['tokenized_data'], finaldata['dictionary'], finaldata['corpus'] = tokenized_data, dictionary, corpus 
+            return finaldata
         except NameError:
             print('idxs list not defined')
     else:
-        return text[1:]
+        tokenized_data, dictionary, corpus = return_data(text[1:])
+        finaldata['text'] = text[1:]
+        finaldata['tokenized_data'], finaldata['dictionary'], finaldata['corpus'] = tokenized_data, dictionary, corpus 
+        return finaldata
 
+def return_data(text_list):
+    tokenizer = nltk.tokenize.RegexpTokenizer(r'\w+')
+    tokenized_data = [[token.strip() for token in tokenizer.tokenize(text)] for text in text_list]
+    dictionary = Dictionary(documents=tokenized_data, prune_at=None)
+    corpus = [dictionary.doc2bow(seq) for seq in tokenized_data]
+    return tokenized_data, dictionary, corpus
 
 
 def _init():
@@ -63,21 +131,24 @@ def _init():
     init_done = True
 
 
-def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=True):
-    """ 
-    * unicodes are extracted before applying stop words and lemmatization
-    * !keep?! keep numbers that are attached to words or other textual characters ex: keep 19 in covid19 not in covid 19
+def remove_unicodes_with_min_count(text_list, min_count):
+    unicodes=[]
+    to_remove=[]
+    pattern1 = r'\\U[0-9A-Za-z]{8}'
+    pattern2 = r'\\u[0-9A-Za-z]{4}'
+    for text in text_list:
+        filtered_text = re.findall(pattern1, text.encode('unicode-escape').decode())
+        unicodes.extend([u for u in filtered_text])
+        filtered_text = re.findall(pattern2, text.encode('unicode-escape').decode())
+        unicodes.extend([u for u in filtered_text])
+    for i in range(min_count+1):
+        idxs=np.where(np.unique(unicodes, return_counts=True)[1]==i)
+        to_remove.extend(list(np.unique(unicodes, return_counts=True)[0][idxs]))
+    return list(set(to_remove)) #make unique
 
-    :param str text: the text to be preprocessed
-    :param bool strip_brackets: If True, the content inside brackets is excluded
-    :param bool keep_unicodes: extract unicodes and aprend them to final output
-        NOTE: removes unicodes from unicodes_to_remove. Might wanna extract unocodes from a given list only
-    :param bool add_adj_nn_pairs: extract adjective/noun pairs. Append them to result
-        NOTE: this implementation keeps adjs and nouns as sole items in final list
-              could be implemented with either nltk or spacy
 
-    TODO: control verbs and adjectives
-    """
+def preprocess(text, strip_brackets, keep_unicodes, add_adj_nn_pairs,  verbs, adjectives, unicodes_to_remove):
+
     global init_done
 
     if not init_done:
@@ -89,10 +160,9 @@ def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=
     if keep_unicodes:
         pattern1 = r'\\U[0-9A-Za-z]{8}'
         pattern2 = r'\\u[0-9A-Za-z]{4}'
-        unicodes1 = re.findall(pattern1, text.encode('unicode-escape').decode())
-        unicodes2 = re.findall(pattern2, text.encode('unicode-escape').decode())
-        unicodes = [u for u in unicodes1 if u not in unicodes_to_remove]
-        unicodes.extend([u for u in unicodes2 if u not in unicodes_to_remove])
+        unicodes = re.findall(pattern1, text.encode('unicode-escape').decode())
+        unicodes.extend(re.findall(pattern2, text.encode('unicode-escape').decode()))
+        unicodes = [u for u in unicodes if u not in unicodes_to_remove]
     
     text = re.sub(r'\b\d+\b', '', text) #or all digits ex: r'\d+'
 
@@ -103,7 +173,7 @@ def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=
     if add_adj_nn_pairs:
         adj_noun_pairs = add_JJ_NN_pairs_nltk(text, lem) #merge adjectives ?
 
-    text = pos_and_lemma(text, lem, verbs=True, adjectives=False) 
+    text = pos_and_lemma(text, lem, verbs, adjectives) 
 
     text = [w for w in text if w not in nltk.corpus.stopwords.words('english')]
 
@@ -119,7 +189,8 @@ def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=
     return text
 
 
-def pos_and_lemma(tokens, lem, verbs=True, adjectives=False):
+
+def pos_and_lemma(tokens, lem, verbs, adjectives):
     # nltk pos tags: https://www.guru99.com/pos-tagging-chunking-nltk.html
     # lem.lemmatize(i,j) -> j: POS tag. Valid options are `"n"` for nouns,`"v"` for verbs, `"a"` for adjectives, `"r"` for adverbs and `"s"` for satellite adjectives.
     result=[]
@@ -154,3 +225,4 @@ def add_JJ_NN_pairs_spacy(text, lem):
         if token.pos_ == "ADJ" and token.head.pos_ == "NOUN":
             adj_noun_pairs.append(lem.lemmatize(token.text ,'a') + lem.lemmatize(token.head.text,'a'))
     return adj_noun_pairs
+
