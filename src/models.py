@@ -2,6 +2,7 @@ import numpy as np
 import os
 from gensim.models import LdaModel, LdaMulticore, HdpModel
 import logging
+from collections import defaultdict
 
 ROOT = '.'
 
@@ -9,10 +10,15 @@ class AbstractModel:
     def __init__(self):
         pass
 
-    def get_document_topics(self, bow, minimum_probability=None, minimum_phi_value=None,
-                            per_word_topics=False):
+    def get_document_topics(self, bow, minimum_probability=None):
         """
         returns List[Tuple[relevantTopicID, probability]]
+        """
+        raise NotImplementedError
+    
+    def get_indexes_per_topics(self, bow_corpus, minimum_probability, index_list):
+        """
+        returns Dict[str(topic_id)]=List[IDs in index_list] -> IDs are appended to each topic given minimum probability
         """
         raise NotImplementedError
     
@@ -86,9 +92,22 @@ class LDAwrapper(AbstractModel):
 
     def get_document_topics(self, bow, minimum_probability=None, minimum_phi_value=None,
                             per_word_topics=False):
+        """
+        bow can be List of doc bows or just one document bow
+        """
         return self.lda.get_document_topics(bow, minimum_probability, minimum_phi_value,
                             per_word_topics)
     
+    def get_indexes_per_topics(self, bow_corpus, minimum_probability, index_list):
+        result=defaultdict(list)
+        generator = self.get_document_topics(bow_corpus, minimum_probability=minimum_probability)
+        if len(bow_corpus)!=len(generator):
+            raise NameError('Something wrong with document topic generator')
+        for i in range(len(generator)):
+            for topic in generator[i]:
+                result[str(topic[0])].append(index_list[i])
+        return result
+
     def get_term_topics(self, word_id, minimum_probability=1.e-20):
         return self.lda.get_term_topics(word_id, minimum_probability)
     
@@ -103,5 +122,5 @@ class LDAwrapper(AbstractModel):
         return result
 
 
-    
+
 
