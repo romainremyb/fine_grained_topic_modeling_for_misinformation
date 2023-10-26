@@ -40,8 +40,13 @@ class AbstractModel:
         if path is not None:
             self.model_path = path
 
+#TODO: topn or p values ?
     # Perform Inference
-    def predict(self, text, topn=5, preprocessing=False):
+    def predict(self, text, topn=5, preprocessing=False, preproc_params=
+                       {'keep_unicodes': {'keep': True, 'min_count_in_corpus': 2},
+                        'strip_brackets': False, 'add_adj_nn_pairs': True, 'verbs': True, 
+                        'adjectives': False}):
+        
         """Predict topic of the given text
 
             :param text: The text on which performing the prediction

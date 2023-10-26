@@ -26,9 +26,13 @@ experiment_result = {
         '0.95': [], 
         '0.95': [], 
     },
-    'word_topic_pvalues': {}, #{topic, [words]},...  gives N words per topics 
+    'word_topic_pvalues': {}, #List[{'words': , 'weight': }],...  gives N words per topics 
     'coherence_metrics': {
-
+        'c_v': None, 
+        'c_npmi': None, 
+        'c_uci': None, 
+        'u_mass': None, 
+        'c_we': None
     }
 }
 
@@ -43,7 +47,7 @@ def preprocess_for_bow(data, return_idxs=True, preprocessing=True, preproc_param
                         'strip_brackets': False, 'add_adj_nn_pairs': True, 'verbs': True, 
                         'adjectives': False}): 
     """
-    return Dict with keys: 
+    :return: Dict with keys: 
         - data as list of text docs
         - ids if flagged
         - data as list of documents - made up of list of tokens
@@ -89,6 +93,10 @@ def preprocess_for_bow(data, return_idxs=True, preprocessing=True, preproc_param
 
     elif is_list_of_strings(data):
         text = data
+    
+    elif isinstance(data,str)==True:
+        text=[data]
+        
     else:
         raise ValueError('data should be a path or a list of strings')
     
@@ -101,19 +109,25 @@ def preprocess_for_bow(data, return_idxs=True, preprocessing=True, preproc_param
                            preproc_params['add_adj_nn_pairs'],  preproc_params['verbs'], 
                            preproc_params['adjectives'], unicodes_to_remove) for doc in text]
     
-    if return_idxs==True:
-        try:
+        if return_idxs==True:
+            try:
+                tokenized_data, dictionary, corpus = return_data(text[1:])
+                finaldata['text'], finaldata['ids'] = text[1:], idxs[1:]
+                finaldata['tokenized_data'], finaldata['dictionary'], finaldata['corpus'] = tokenized_data, dictionary, corpus 
+                return finaldata
+            except NameError:
+                print('idxs list not defined')
+        else:
             tokenized_data, dictionary, corpus = return_data(text[1:])
-            finaldata['text'], finaldata['ids'] = text[1:], idxs[1:]
+            finaldata['text'] = text[1:]
             finaldata['tokenized_data'], finaldata['dictionary'], finaldata['corpus'] = tokenized_data, dictionary, corpus 
             return finaldata
-        except NameError:
-            print('idxs list not defined')
+        
     else:
-        tokenized_data, dictionary, corpus = return_data(text[1:])
-        finaldata['text'] = text[1:]
-        finaldata['tokenized_data'], finaldata['dictionary'], finaldata['corpus'] = tokenized_data, dictionary, corpus 
+        finaldata['text'] = text
         return finaldata
+
+
 
 def return_data(text_list):
     tokenizer = nltk.tokenize.RegexpTokenizer(r'\w+')
@@ -122,14 +136,12 @@ def return_data(text_list):
     corpus = [dictionary.doc2bow(seq) for seq in tokenized_data]
     return tokenized_data, dictionary, corpus
 
-
 def _init():
     global init_done
     nltk.download('stopwords')
     nltk.download('wordnet')
     nltk.download('averaged_perceptron_tagger')
     init_done = True
-
 
 def remove_unicodes_with_min_count(text_list, min_count):
     unicodes=[]
@@ -146,8 +158,7 @@ def remove_unicodes_with_min_count(text_list, min_count):
         to_remove.extend(list(np.unique(unicodes, return_counts=True)[0][idxs]))
     return list(set(to_remove)) #make unique
 
-
-def preprocess(text, strip_brackets, keep_unicodes, add_adj_nn_pairs,  verbs, adjectives, unicodes_to_remove):
+def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=True,  verbs=True, adjectives=False, unicodes_to_remove=unicodes_to_remove):
 
     global init_done
 
@@ -189,7 +200,6 @@ def preprocess(text, strip_brackets, keep_unicodes, add_adj_nn_pairs,  verbs, ad
     return text
 
 
-
 def pos_and_lemma(tokens, lem, verbs, adjectives):
     # nltk pos tags: https://www.guru99.com/pos-tagging-chunking-nltk.html
     # lem.lemmatize(i,j) -> j: POS tag. Valid options are `"n"` for nouns,`"v"` for verbs, `"a"` for adjectives, `"r"` for adverbs and `"s"` for satellite adjectives.
@@ -205,7 +215,6 @@ def pos_and_lemma(tokens, lem, verbs, adjectives):
             result.append(lem.lemmatize(i, 'a'))
     return result
 
-
 def add_JJ_NN_pairs_nltk(tokens, lem):
     adj_noun_pairs = []
     pos_tagged = pos_tag(tokens)
@@ -215,7 +224,6 @@ def add_JJ_NN_pairs_nltk(tokens, lem):
         if pos.startswith('JJ') and next_pos.startswith('NN'):
             adj_noun_pairs.append(lem.lemmatize(word,'a') + lem.lemmatize(next_word,'a'))
     return adj_noun_pairs
-
 
 def add_JJ_NN_pairs_spacy(text, lem):
     adj_noun_pairs = []

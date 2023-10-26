@@ -7,8 +7,11 @@ from collections import defaultdict
 ROOT = '.'
 
 class AbstractModel:
-    def __init__(self):
-        pass
+    def __init__(self, bow_corpus, id2word, index_list=None):
+        self.bow_corpus=bow_corpus
+        self.id2word=id2word
+        self.index_list=index_list
+
 
     def get_document_topics(self, bow, minimum_probability=None):
         """
@@ -28,21 +31,22 @@ class AbstractModel:
         """
         raise NotImplementedError
     
-    def get_term_topic_distributions(self, num_words=10):
-        """
-        returns Dict[str(topic_label)] -> List[(term, probability), ...]
-        """
-        raise NotImplementedError
+    
+
+"""
+metrics
+
+"""
 
 
 
-
-class LDAwrapper(AbstractModel):
-    def __init__(self, model, corpus, dictionary, num_topics, decay=0.5, chunksize=2000, gamma_threshold=0.001):
-        super().__init__()
-        if model=="LdaModel":
-            self.lda = LdaModel(corpus, num_topics=num_topics,
-                        id2word= dictionary,
+class LDAwrappers(AbstractModel):
+    def __init__(self, bow_corpus, id2word, model, num_topics, decay=0.5, chunksize=2000, gamma_threshold=0.001):
+        super().__init__(bow_corpus, id2word, None)
+        modelnames=['LdaModelGensim', 'LdaMulticoreGensim']
+        if model=="LdaModelGensim":
+            self.model = LdaModel(bow_corpus, num_topics=num_topics,
+                        id2word= id2word,
                         distributed=False,
                         chunksize=chunksize, #training chunks
                         decay=decay, # rate at which previous lambda value is forgotten (0.5,1)
@@ -63,9 +67,9 @@ class LDAwrapper(AbstractModel):
                         callbacks=None,
                         dtype=np.float32)
             
-        elif model=="LdaMulticore":
-            self.lda = LdaMulticore(corpus=corpus, num_topics=num_topics, 
-                        id2word= dictionary,
+        elif model=="LdaMulticoreGensim":
+            self.model = LdaMulticore(corpus=bow_corpus, num_topics=num_topics, 
+                        id2word= id2word,
                         workers=None, #all available if None
                         batch=True, #True for batch learning, False for online learning (streaming)
                         chunksize=2000, #training chunks
@@ -87,15 +91,15 @@ class LDAwrapper(AbstractModel):
                         dtype=np.float32)
 
         else:
-            raise ValueError('Wrong model name!')
-            return 
+            raise ValueError(f'Wrong model name! must be one of {modelnames}')
+     
 
     def get_document_topics(self, bow, minimum_probability=None, minimum_phi_value=None,
                             per_word_topics=False):
         """
         bow can be List of doc bows or just one document bow
         """
-        return self.lda.get_document_topics(bow, minimum_probability, minimum_phi_value,
+        return self.model.get_document_topics(bow, minimum_probability, minimum_phi_value,
                             per_word_topics)
     
     def get_indexes_per_topics(self, bow_corpus, minimum_probability, index_list):
@@ -109,18 +113,51 @@ class LDAwrapper(AbstractModel):
         return result
 
     def get_term_topics(self, word_id, minimum_probability=1.e-20):
-        return self.lda.get_term_topics(word_id, minimum_probability)
+        return self.model.get_term_topics(word_id, minimum_probability)
     
 
-    def get_term_topic_distributions(self, num_words=10):
-        result=dict()
-        prints = self.lda.print_topics(num_words=num_words)
-        for r in prints:
-            result[str(r[0])] = []
-            for term in r[1].split(' + '):
-                result[str(r[0])].append((term.split('*')[1].replace('"',''), float(term.split('*')[0])))
-        return result
+
+    @property
+    def topics(self):
+        if self.model is None:
+            self.load()
+
+        return [self.topic(i) for i in range(0, self.model.num_topics)]
+
+    def topic(self, topic_id: int, topn: int):
+        if self.model is None:
+            self.load()
+        words = []
+        weights = []
+        for word, weight in self.model.show_topic(topic_id, topn=10):
+            weights.append(weight)
+            words.append(word)
+        return {
+            'words': words,
+            'weights': weights
+        }
 
 
 
+class HDPwrapper(AbstractModel):
+    def __init__(self, bow_corpus, id2word):
+        super().__init__(bow_corpus, id2word, None)
+        #https://radimrehurek.com/gensim/models/hdpmodel.html
+        self.model = HdpModel(bow_corpus, id2word,
+                            max_chunks=None, #Upper bound on how many chunks to process (retakes chunks from beginning of corpus if not enough docs)
+                                                #! if (max_chunks, max_time)==None, max_chunks=m_D=len(corpus) -> means chunksize passes over the corpus !?
+                                                # set as factor of len(corpus)?
+                            chunksize=256, #docs per chunks
+                            max_time=None, #upper bound on time for training model
+                            kappa=1.0, #exponentital decay factor for learning on batches
+                            tau=64.0, #downweight early iterations of documents
+                            K=15, # Second level truncation level
+                            T=150, #Top level truncation level
+                            alpha=1, #Second level concentration
+                            gamma=1, #first level concentration
+                            eta=0.01, #topic Dirichlet prior
+                            scale=1.0, #Weights information from the mini-chunk of corpus to calculate rhot
+                            var_converge=0.0001, # Lower bound on the right side of convergence. Used when updating variational parameters for a single document
+                            outputdir=None, 
+                            random_state=None)
 
