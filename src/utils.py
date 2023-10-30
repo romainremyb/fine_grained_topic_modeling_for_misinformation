@@ -5,6 +5,7 @@ import sys
 import spacy
 from gensim.corpora import Dictionary
 import numpy as np
+from collections import defaultdict
 
 
 init_done = False
@@ -18,22 +19,16 @@ experiment_result = {
     'number_topics': None, #int, None if infered ex: HDP
     'hyperparameters': {},
     'doc_topic_pvalues': { # get for all above or filter in range ?
-        '0.30': [], #list of ids
-        '0.50': [], 
-        '0.60': [], 
-        '0.75': [], 
-        '0.90': [], 
-        '0.95': [], 
-        '0.95': [], 
+        '0.30': {}, #list of ids
+        '0.50': {}, 
+        '0.60': {}, 
+        '0.75': {}, 
+        '0.90': {}, 
+        '0.95': {}, 
+        '0.95': {}, 
     },
-    'word_topic_pvalues': {}, #List[{'words': , 'weight': }],...  gives N words per topics 
-    'coherence_metrics': {
-        'c_v': None, 
-        'c_npmi': None, 
-        'c_uci': None, 
-        'u_mass': None, 
-        'c_we': None
-    }
+    'word_topic_pvalues': dict(),
+    'coherence_metrics': defaultdict()
 }
 
 
@@ -79,7 +74,7 @@ def preprocess_for_bow(data, return_idxs=True, preprocessing=True, preproc_param
                         if len(line.rstrip().split('",',1)[-1][1:-1])>=3:
                             text.append(line.rstrip().split('",',1)[-1][1:-1])
                             idxs.append(line.rstrip().split('",',1)[0][1:-1])
-            elif data[-4:]=='.txt':
+            elif data[-4:]=='.txt': #TODO -> try with .txt file
                 return_idxs=False #TODO: Log the fact that is is considering entire lines as text docs
                 with open(data, "r", encoding='utf-8') as datafile:
                     text = [line.rstrip() for line in datafile if line and len(line)!=0]
