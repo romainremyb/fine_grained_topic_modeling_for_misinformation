@@ -155,7 +155,6 @@ class AbstractModel:
 
             else:
                 start_time = time.time()
-                print('initiate')
                 while True:
                     if time.time() - start_time > max_time:
                         self.log.info('Timeout reached. Exiting the loop.')

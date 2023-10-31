@@ -8,7 +8,7 @@ from utils import preprocess_for_bow, preprocess
 ROOT = '.'
 
 class LDAwrappers(AbstractModel):
-    def __init__(self, bow_corpus, id2word, model, num_topics, decay=0.5, chunksize=2000, gamma_threshold=0.001):
+    def __init__(self, bow_corpus, id2word, model, num_topics, decay=0.5, passes=1, chunksize=2000, gamma_threshold=0.001):
         super().__init__(bow_corpus, id2word, None)
         modelnames=['LdaModelGensim', 'LdaMulticoreGensim']
         self.num_topics=num_topics

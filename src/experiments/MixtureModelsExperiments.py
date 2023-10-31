@@ -13,7 +13,7 @@ from collections import defaultdict
 sys.path.append(os.path.expanduser("~")+'/Desktop/topic_modeling/fine_grained_topic_modeling_for_misinformation/src/')
 sys.path.append(os.path.expanduser("~")+'/Desktop/topic_modeling/fine_grained_topic_modeling_for_misinformation/src/')
 os.chdir(os.path.expanduser("~")+'/Desktop/topic_modeling/fine_grained_topic_modeling_for_misinformation/data/')
-from utils import preprocess_for_bow, experiment_result
+from utils import preprocess_for_bow
 from models.lda import LDAwrappers
 from models.hdp import HDPwrapper
 from models.gsdmm import MovieGroupProcessWrapper
@@ -24,8 +24,24 @@ def combine(params):
     param_combinations = list(itertools.product(*param_values))
     return param_combinations
 
+experiment_result = {
+    'number_topics': None, #int, None if infered ex: HDP
+    'hyperparameters': {},
+    'doc_topic_pvalues': { # get for all above or filter in range ?
+        '0.35': {}, #list of ids
+        '0.50': {}, #list of ids
+        '0.60': {}, 
+        '0.75': {}, 
+        '0.90': {}, 
+        '0.95': {}, 
+        '0.95': {}, 
+    },
+    'word_topic_pvalues': dict(),
+    'coherence_metrics': defaultdict()
+}
 
-lda_param={'num_topics': range(5,20), 'decay': [0.5,0.75,0.9]}
+
+lda_param={'num_topics': range(5,20), 'decay': [0.5,0.75,0.9], 'passes': [1,2,5]}
 
 hdp_param={'kappa': [1,1.05,1.1], 'K': [10, 15, 30], 'T': [100,150,200],
            'alpha': [0.9,1,1.1], 'gamma': [0.9,1,1.1], 'eta': [0.01, 0.05]}
@@ -44,12 +60,12 @@ def lda_experiment():
         param_set = dict(zip(list(lda_param.keys()), params))
         results['number_topics']=param_set['num_topics']
         results['hyperparameters']=param_set
-        lda=LDAwrappers(data['corpus'], data['dictionary'], 'LdaModelGensim', num_topics=param_set['num_topics'],
-                        decay=param_set['decay'])
-        for pvalue in results['doc_topic_pvalues']:
-            results['doc_topic_pvalues'][pvalue]=lda.get_indexes_per_topics(data['corpus'], pvalue, data['ids'])
-        results['word_topic_pvalues']=lda.topics(topn=10)
-        results['coherence_metrics']=lda.coherence(data['tokenized_data'], ['u_mass']) #c_we?
+        model=LDAwrappers(data['corpus'], data['dictionary'], 'LdaModelGensim', num_topics=param_set['num_topics'],
+                        decay=param_set['decay'], passes=param_set['passes'])
+        for pvalue in results['doc_topic_pvalues'].keys():
+            results['doc_topic_pvalues'][pvalue]=model.get_indexes_per_topics(data['corpus'], float(pvalue), data['ids'])
+        results['word_topic_pvalues']=model.topics(topn=10)
+        results['coherence_metrics']=model.coherence(data['tokenized_data'], ['u_mass']) 
         experiment['exp_'+str(i)]=results
         i+=1
         if i%10==0:
@@ -117,22 +133,23 @@ def main():
             experiment_results = json.load(json_file)
             #job
             lda_exp = lda_experiment()
-            hdp_exp = hdp_experiment()
-            gsdmm = gsdmm_experiment()
+            #hdp_exp = hdp_experiment()
+            #gsdmm = gsdmm_experiment()
             #end job
             experiment_results['lda_experiment']=lda_exp
-            experiment_results['hdp_experiment']=hdp_exp
-            experiment_results['gsdmm_experiment']=gsdmm_exp
+            #experiment_results['hdp_experiment']=hdp_exp
+            #experiment_results['gsdmm_experiment']=gsdmm_exp
             save_json(args.experiment_file, experiment_results)
     else:
         #job
+        experiment_results=dict()
         lda_exp = lda_experiment()
-        hdp_exp = hdp_experiment()
-        gsdmm = gsdmm_experiment()
+        #hdp_exp = hdp_experiment()
+        #gsdmm = gsdmm_experiment()
         #end job
         experiment_results['lda_experiment']=lda_exp
-        experiment_results['hdp_experiment']=hdp_exp
-        experiment_results['gsdmm_experiment']=gsdmm_exp
+        #experiment_results['hdp_experiment']=hdp_exp
+        #experiment_results['gsdmm_experiment']=gsdmm_exp
         save_json(args.experiment_file, experiment_results)
 
 

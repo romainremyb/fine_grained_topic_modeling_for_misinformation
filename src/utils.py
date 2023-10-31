@@ -19,8 +19,8 @@ experiment_result = {
     'number_topics': None, #int, None if infered ex: HDP
     'hyperparameters': {},
     'doc_topic_pvalues': { # get for all above or filter in range ?
-        '0.30': {}, #list of ids
-        '0.50': {}, 
+        '0.35': {}, #list of ids
+        '0.50': {}, #list of ids
         '0.60': {}, 
         '0.75': {}, 
         '0.90': {}, 
