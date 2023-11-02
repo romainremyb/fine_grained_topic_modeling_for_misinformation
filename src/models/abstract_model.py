@@ -9,10 +9,10 @@ from utils import preprocess_for_bow, preprocess
 
 ROOT = '.'
 
-logging.basicConfig(level=logging.WARNING)
+#logging.basicConfig(level=logging.WARNING)
 
 class AbstractModel:
-    def __init__(self, bow_corpus, id2word, index_list=None):
+    def __init__(self, bow_corpus=None, id2word=None, index_list=None):
         self.bow_corpus=bow_corpus
         self.id2word=id2word
         self.index_list=index_list
@@ -110,7 +110,7 @@ class AbstractModel:
         return self.topics[topic_id]
     
 
-    def coherence(self, tokenized_dataset, metrics=['c_v', 'c_npmi', 'c_uci', 'u_mass', 'c_we'], max_time=60*3, glove_path='glove/glove.6B.300d.txt'):
+    def coherence(self, tokenized_dataset, metrics=['c_v', 'c_npmi', 'c_uci', 'u_mass', 'c_we'], glove_path='glove/glove.6B.300d.txt'):
         """ Get the coherence of the topic mode.
 
         :param tokenized_dataset: List of of documents, documents are lists of doc elements
@@ -121,7 +121,7 @@ class AbstractModel:
             if metric not in ['c_v', 'c_npmi', 'c_uci', 'u_mass', 'c_we']:
                 raise RuntimeError('Unrecognised metric: ' + metric)
 
-            topic_words = [x['words'] for x in self.topics()]
+            topic_words = [x['words'] for x in self.topics() if len(x['words'])!=0]
 
             self.log.debug('loading dataset')
 
@@ -149,16 +149,12 @@ class AbstractModel:
                             score += glove.similarity(word1, word2)
                             count += 1
 
-                    results[metric]['c_we_per_topic'].append(0 if count == 0 else score / count)
-                results[metric]['c_we'] = np.mean(results[metric]['c_we_per_topic'])
-                results[metric]['c_we_std'] = np.std(results[metric]['c_we_per_topic'])
+                results[metric]['c_we_per_topic'].append(0 if count == 0 else float(score / count))
+                results[metric]['c_we'] = np.mean(results[metric]['c_we_per_topic']).item()
+                results[metric]['c_we_std'] = np.std(results[metric]['c_we_per_topic']).item()
 
             else:
-                start_time = time.time()
                 while True:
-                    if time.time() - start_time > max_time:
-                        self.log.info('Timeout reached. Exiting the loop.')
-                        break
 
                     self.log.debug('creating coherence model')
 
@@ -167,11 +163,11 @@ class AbstractModel:
                     
                     coherence_per_topic = coherence_model.get_coherence_per_topic()
 
-                    topic_coherence = [coherence_per_topic[i] for i, t in enumerate(self.topics())]
+                    topic_coherence = [coherence_per_topic[i].item() for i, t in enumerate(self.topics())]
 
                     results[metric][metric + '_per_topic'] = topic_coherence
-                    results[metric][metric] = np.nanmean(coherence_per_topic)
-                    results[metric][metric + '_std'] = np.nanstd(coherence_per_topic)
+                    results[metric][metric] = np.nanmean(coherence_per_topic).item()
+                    results[metric][metric + '_std'] = np.nanstd(coherence_per_topic).item()
 
                     break
 

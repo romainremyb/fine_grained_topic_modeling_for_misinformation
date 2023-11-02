@@ -87,7 +87,7 @@ class MovieGroupProcessWrapper(AbstractModel):
         """
         bow can be List of doc bows or just one document bow
         """
-        return [get_indexes(np.array(self.score(doc_bow)), minimum_probability) for doc_bow in bow]
+        return [get_indexes(np.array(self.score(doc_bow)), float(minimum_probability)) for doc_bow in bow]
 
     def get_indexes_per_topics(self, bow_corpus, minimum_probability, index_list):
         result=defaultdict(list)
@@ -107,13 +107,13 @@ class MovieGroupProcessWrapper(AbstractModel):
             current_freq = []
             total = sum(topic.values())
             for word, freq in sorted(topic.items(), key=lambda item: item[1], reverse=True)[:topn]:
-                current_words.append(word)
+                current_words.append(self.id2word[word[0]])
                 current_freq.append(freq / total)
-
-            topics.append({
-                'words': current_words,
-                'weights': current_freq
-            })
+            if len(current_words)>0:
+                topics.append({
+                    'words': current_words,
+                    'weights': current_freq
+                })
         return topics
 
     def topic(self, topic_id: int, topn=10):

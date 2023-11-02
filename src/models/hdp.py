@@ -6,13 +6,13 @@ import logging
 from collections import defaultdict
 from utils import preprocess_for_bow, preprocess
 
-ROOT = '.'
 
 def get_indexes(topics_pred, threshold):
     return [(i, topics_pred[i]) for i in np.where(topics_pred>threshold)[0]]
 
 class HDPwrapper(AbstractModel):
-    def __init__(self, bow_corpus, id2word): #TODO check the overchunking_factor -> setting as 256 should give simiular results as with None -> check with a range of factors from (1 to 256)
+    def __init__(self, bow_corpus, id2word, kappa=1.0, K=15, T=150,
+                alpha=1, gamma=1, eta=0.01): 
         super().__init__(bow_corpus, id2word, None)
         #https://radimrehurek.com/gensim/models/hdpmodel.html
         self.model = HdpModel(bow_corpus, id2word,
@@ -20,13 +20,13 @@ class HDPwrapper(AbstractModel):
                                         # if None -> same as len(corpus)/chunksize
                 chunksize=256, #docs per chunks
                 max_time=None, #upper bound on time for training model
-                kappa=1.0, #exponentital decay factor for learning on batches
+                kappa=kappa, #exponentital decay factor for learning on batches
                 tau=64.0, #downweight early iterations of documents
-                K=15, # Second level truncation level
-                T=150, #Top level truncation level
-                alpha=1, #Second level concentration
-                gamma=1, #first level concentration
-                eta=0.01, #topic Dirichlet prior 
+                K=K, # Second level truncation level
+                T=T, #Top level truncation level
+                alpha=alpha, #Second level concentration
+                gamma=gamma, #first level concentration
+                eta=eta, #topic Dirichlet prior 
                 scale=1.0, #Weights information from the mini-chunk of corpus to calculate rhot
                 var_converge=0.0001, # Lower bound on the right side of convergence. Used when updating variational parameters for a single document
                 outputdir=None, 
@@ -92,7 +92,7 @@ class HDPwrapper(AbstractModel):
         words = []
         weights = []
         for word, weight in self.model.show_topic(topic_id, topn=topn):
-            weights.append(weight)
+            weights.append(float(weight))
             words.append(word)
         return {
             'words': words,

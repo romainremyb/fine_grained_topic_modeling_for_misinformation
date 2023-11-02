@@ -19,7 +19,7 @@ class LDAwrappers(AbstractModel):
                         distributed=False,
                         chunksize=chunksize, #training chunks
                         decay=decay, # rate at which previous lambda value is forgotten (0.5,1)
-                        passes=1, #training epochs
+                        passes=passes, #training epochs
                         update_every=0, #number of documents to be iterated through for each update (during model deployement: set 0 if only need batch training over given corpus)
                         alpha='auto', #document/topic priors - array | symmetric=1/num_topics | 'asymmetric'=(topic_index + sqrt(num_topics)) | 'auto': learns asymmetric from corpus (need distributed set to True) 
                         eta='auto', #topic-word  priors - shape (num_topics, num_words) or vector for equal priors accross words
@@ -43,7 +43,7 @@ class LDAwrappers(AbstractModel):
                         batch=True, #True for batch learning, False for online learning (streaming)
                         chunksize=2000, #training chunks
                         decay=0.5, # rate at which previous lambda value is forgotten (0.5,1)
-                        passes=1, #training epochs
+                        passes=passes, #training epochs
                         alpha='auto', #document/topic priors - array | symmetric=1/num_topics | 'asymmetric'=(topic_index + sqrt(num_topics)) | 'auto': learns asymmetric from corpus (need distributed set to True) 
                         eta='auto', #topic-word  priors - shape (num_topics, num_words) or vector for equal priors accross words
                                         #asymmetric and auto possible but equal distrib across words
@@ -120,7 +120,7 @@ class LDAwrappers(AbstractModel):
         words = []
         weights = []
         for word, weight in self.model.show_topic(topic_id, topn=topn):
-            weights.append(weight)
+            weights.append(float(weight))
             words.append(word)
         return {
             'words': words,

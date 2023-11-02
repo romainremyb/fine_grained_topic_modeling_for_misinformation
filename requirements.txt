@@ -21,3 +21,4 @@ wordcloud
 spacy
 contextualized_topic_models
 umap-learn
+statsmodels
