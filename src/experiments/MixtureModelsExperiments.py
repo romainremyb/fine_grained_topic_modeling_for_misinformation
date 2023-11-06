@@ -1,9 +1,10 @@
-import sys, os, json
+import sys, os, json, time
 import re, nltk
 import argparse
 from nltk import pos_tag
 import pandas as pd
 import numpy as np
+from numpy import random
 import matplotlib.pyplot as plt
 import sklearn, gensim
 from sklearn.decomposition import PCA
@@ -17,9 +18,9 @@ from utils import preprocess_for_bow
 from models.lda import LDAwrappers
 from models.hdp import HDPwrapper
 from models.gsdmm import MovieGroupProcessWrapper
+from models.lftm import LFTMwrapper
 
 def combine(params):
-    param_names = list(params.keys())
     param_values = list(params.values())
     param_combinations = list(itertools.product(*param_values))
     return param_combinations
@@ -34,19 +35,30 @@ experiment_result = {
         '0.75': None, 
         '0.90': None, 
         '0.95': None, 
-        '0.95': None, 
+        '0.99': None, 
     },
     'word_topic_pvalues': dict(),
     'coherence_metrics': defaultdict()
 }
 
 
-lda_param={'num_topics': [i for i in range(5,20) if i%2==0], 'decay': [0.5,0.75,0.9], 'passes': [1,2,5]}
+lda_param={'num_topics': [7, 10, 13], 'decay': [0.5,0.75,0.9], 'passes': [1,2,5]}
 
 hdp_param={'kappa': [1,1.05,1.1], 'K': [10, 15, 30], 'T': [100,150,200],
-           'alpha': [0.9,1,1.1], 'gamma': [0.9,1,1.1], 'eta': [0.01, 0.05]}
+           'alpha': [0.9,1,1.1], 'gamma': [0.9,1,1.1], 'eta': [0.01, 0.05]}  
 
-gsdmm_param={'K': [i for i in range(6,27) if i%3==0], 'alpha': [0.1, 0.2], 'beta': [0.1, 0.2], 'n_iters': [1, 5, 15]}
+lftm_param={'num_topics': [7, 10], 'alpha': [0.075,0.15,0.225], 'beta': [0.075,0.15,0.225], '_lambda': [0.6,0.75,0.9]}
+
+
+def min_max(x, min, max): return min if x < min else max if x > max else x
+def gen_kappa (): return min_max(abs(random.normal(loc=1, scale=0.1)), 1, 1.2)
+def gen_K (): return min_max(int(abs(random.normal(loc=15, scale=7.5))), 10, 30)
+def gen_T (): return min_max(int(abs(random.normal(loc=150, scale=35))), 100, 200)
+def gen_alpha_gamma (): return min_max(abs(random.normal(loc=1, scale=0.05)), 0.85, 1.15)
+def gen_eta (): return min_max(abs(random.normal(loc=0.01, scale=0.025)), 0.01, 0.12)
+
+def gen_hdp_param(): return {'kappa': gen_kappa(), 'K': gen_K(), 'T': gen_T(),
+           'alpha': gen_alpha_gamma(), 'gamma': gen_alpha_gamma(), 'eta': gen_eta()}
 
 data = preprocess_for_bow('data.csv')
 
@@ -58,13 +70,14 @@ def lda_experiment(data):
     for params in combine(lda_param):
         results = experiment_result.copy()
         param_set = dict(zip(list(lda_param.keys()), params))
-        print(param_set)
         results['number_topics']=param_set['num_topics']
         results['hyperparameters']=param_set
         model=LDAwrappers(data['corpus'], data['dictionary'], 'LdaModelGensim', num_topics=param_set['num_topics'],
                         decay=param_set['decay'], passes=param_set['passes'])
+        ntopics=len(model.topics())
         for pvalue in results['doc_topic_pvalues'].keys():
-            results['doc_topic_pvalues'][pvalue]=len(model.get_indexes_per_topics(data['corpus'], float(pvalue), data['ids']))
+            idx=model.get_indexes_per_topics(data['corpus'], float(pvalue), data['ids'])
+            results['doc_topic_pvalues'][pvalue]=[len(idx[str(i)])  if str(i) in idx.keys() else 0 for i in range(ntopics)]
         results['word_topic_pvalues']=model.topics(topn=10)
         results['coherence_metrics']=model.coherence(data['tokenized_data'], ['u_mass', 'c_we']) 
         experiment['exp_'+str(i)]=results
@@ -74,25 +87,26 @@ def lda_experiment(data):
     return experiment
 
 
-def hdp_experiment(data):
+def hdp_experiment(data, n=35):
     experiment=dict()
-    i=0
     print('running hdp experiment')
-    print(f"{len(combine(hdp_param))} experimentations to make")
-    for params in combine(hdp_param):
+    print(f"{n} experimentations to make")
+    for i in range(n):
         results = experiment_result.copy()
-        param_set = dict(zip(list(hdp_param.keys()), params))
+        param_set = gen_hdp_param()
         results['number_topics']=None
         results['hyperparameters']=param_set
         model=HDPwrapper(data['corpus'], data['dictionary'], kappa=param_set['kappa'], K=param_set['K'], T=param_set['T'], 
                             alpha=param_set['alpha'], gamma=param_set['gamma'], eta=param_set['eta'])
-        for pvalue in results['doc_topic_pvalues']:
-            results['doc_topic_pvalues'][pvalue]=len(model.get_indexes_per_topics(data['corpus'], float(pvalue), data['ids']))
+        ntopics=len(model.topics())
+        for pvalue in results['doc_topic_pvalues'].keys():
+            idx=model.get_indexes_per_topics(data['corpus'], float(pvalue), data['ids'])
+            results['doc_topic_pvalues'][pvalue]=[len(idx[str(i)])  if str(i) in idx.keys() else 0 for i in range(ntopics)]
         results['word_topic_pvalues']=model.topics(topn=10)
         results['coherence_metrics']=model.coherence(data['tokenized_data'], ['u_mass', 'c_we']) 
         experiment['exp_'+str(i)]=results
         i+=1
-        if i%5==0:
+        if i%1==0:
             print(f"running the {i}th experiment")
     return experiment
 
@@ -109,14 +123,43 @@ def gsdmm_experiment(data):
         results['hyperparameters']=param_set
         model=MovieGroupProcessWrapper(data['corpus'], data['dictionary'], K=param_set['K'], 
                     alpha=param_set['alpha'], beta=param_set['beta'], n_iters=param_set['n_iters'])
-        for pvalue in results['doc_topic_pvalues']:
-            results['doc_topic_pvalues'][pvalue]=len(model.get_indexes_per_topics(data['corpus'], float(pvalue), data['ids']))
+        ntopics=len(model.topics())
+        for pvalue in results['doc_topic_pvalues'].keys():
+            idx=model.get_indexes_per_topics(data['corpus'], float(pvalue), data['ids'])
+            results['doc_topic_pvalues'][pvalue]=[len(idx[str(i)])  if str(i) in idx.keys() else 0 for i in range(ntopics)]
         results['word_topic_pvalues']=model.topics(topn=10)
         results['coherence_metrics']=model.coherence(data['tokenized_data'], ['u_mass', 'c_we']) 
         experiment['exp_'+str(i)]=results
         i+=1
         if i%5==0:
             print(f"runnin the {i}th experiment")
+    return experiment
+
+
+def lftm_experiment(datapath):
+    experiment=dict()
+    i=0
+    print('running lftm experiment')
+    print(f"{len(combine(lftm_param))} experimentations to make")
+    for params in combine(lftm_param):
+        results = experiment_result.copy()
+        param_set = dict(zip(list(lftm_param.keys()), params))
+        results['number_topics']=param_set['num_topics']
+        results['hyperparameters']=param_set
+        model=LFTMwrapper(datapath, num_topics=param_set['num_topics'], alpha=param_set['alpha'], 
+                        beta=param_set['beta'], _lambda=param_set['_lambda'])
+        ntopics=len(model.topics())
+        #for pvalue in results['doc_topic_pvalues'].keys():
+            #idx=model.get_indexes_per_topics(datapath, float(pvalue))
+            #results['doc_topic_pvalues'][pvalue]=[len(idx[str(i)])  if str(i) in idx.keys() else 0 for i in range(ntopics)]
+        results['word_topic_pvalues']=model.topics()
+        print('launching coherence')
+        results['coherence_metrics']=model.coherence(data['tokenized_data'], ['u_mass', 'c_we']) 
+        experiment['exp_'+str(i)]=results
+        model.clean_dir()
+        i+=1
+        if i%1==0:
+            print(f"runnin the {i}th experiment.")
     return experiment
 
 
@@ -138,22 +181,26 @@ def main():
             #job
             #lda_exp = lda_experiment(data)
             #hdp_exp = hdp_experiment(data)
-            gsdmm_exp = gsdmm_experiment(data)
+            #gsdmm_exp = gsdmm_experiment(data)
+            lftm_exp = lftm_experiment(args.data_path)
             #end job
             #experiment_results['lda_experiment']=lda_exp
             #experiment_results['hdp_experiment']=hdp_exp
-            experiment_results['gsdmm_experiment']=gsdmm_exp
+            #experiment_results['gsdmm_experiment']=gsdmm_exp
+            experiment_results['lftm_experiment']=lftm_exp
             save_json(args.experiment_file, experiment_results)
     else:
         #job
         experiment_results=dict()
-        lda_exp = lda_experiment()
-        hdp_exp = hdp_experiment()
-        gsdmm_exp = gsdmm_experiment()
+        lda_exp = lda_experiment(data)
+        hdp_exp = hdp_experiment(data)
+        gsdmm_exp = gsdmm_experiment(data)
+        lftm_exp = lftm_experiment(args.data_path)
         #end job
         experiment_results['lda_experiment']=lda_exp
         experiment_results['hdp_experiment']=hdp_exp
         experiment_results['gsdmm_experiment']=gsdmm_exp
+        experiment_results['lftm_experiment']=lftm_exp
         save_json(args.experiment_file, experiment_results)
 
 

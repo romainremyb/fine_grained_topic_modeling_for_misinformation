@@ -9,7 +9,23 @@ from utils import preprocess_for_bow, preprocess
 
 ROOT = '.'
 
-#logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.WARNING)
+
+def exclusivity_measure(topic_words, glove):
+    scores=[]
+    for topic in topic_words:
+        topic_score=0
+        topic_count=0
+        for w in topic:
+            for topic_ in topic_words:
+                if topic_!=topic:
+                    for w2 in topic_:
+                        if w not in glove or w2 not in glove: continue
+                        topic_score += glove.similarity(w, w2)
+                        topic_count += 1
+        scores.append(0 if (topic_score == 0 or topic_count==0) else float(topic_score/topic_count))
+    return scores
+
 
 class AbstractModel:
     def __init__(self, bow_corpus=None, id2word=None, index_list=None):
@@ -49,7 +65,6 @@ class AbstractModel:
             :param int topn: Number of most probable topics to return
             :param bool preprocess: If True, execute preprocessing on the document
         """
-
         tokenized_data=preprocess(text) 
         bow = [self.id2word.doc2bow(seq) for seq in tokenized_data]
         
@@ -108,7 +123,7 @@ class AbstractModel:
         """
 
         return self.topics[topic_id]
-    
+   
 
     def coherence(self, tokenized_dataset, metrics=['c_v', 'c_npmi', 'c_uci', 'u_mass', 'c_we'], glove_path='glove/glove.6B.300d.txt'):
         """ Get the coherence of the topic mode.
@@ -149,9 +164,14 @@ class AbstractModel:
                             score += glove.similarity(word1, word2)
                             count += 1
 
-                results[metric]['c_we_per_topic'].append(0 if count == 0 else float(score / count))
+                    results[metric]['c_we_per_topic'].append(0 if count == 0 else float(score / count))
                 results[metric]['c_we'] = np.mean(results[metric]['c_we_per_topic']).item()
                 results[metric]['c_we_std'] = np.std(results[metric]['c_we_per_topic']).item()
+
+                results[metric]['excl_we_per_topic'] = exclusivity_measure(topic_words, glove) 
+                results[metric]['excl_we'] = np.mean(results[metric]['excl_we_per_topic']).item()
+                results[metric]['excl_we_std'] = np.std(results[metric]['excl_we_per_topic']).item()
+
 
             else:
                 while True:
@@ -173,4 +193,7 @@ class AbstractModel:
 
 
         return results
+    
+
+
     

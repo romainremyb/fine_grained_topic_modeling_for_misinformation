@@ -36,11 +36,11 @@ def is_list_of_strings(lst):
     return bool(lst) and isinstance(lst, list) and all(isinstance(elem, str) for elem in lst)
 
 
-#TODO: add wordName/id dictionary ?
+
 def preprocess_for_bow(data, return_idxs=True, preprocessing=True, preproc_params=
                        {'keep_unicodes': {'keep': True, 'min_count_in_corpus': 2},
                         'strip_brackets': False, 'add_adj_nn_pairs': True, 'verbs': True, 
-                        'adjectives': False}): 
+                        'adjectives': True}): 
     """
     :return: Dict with keys: 
         - data as list of text docs
@@ -120,6 +120,7 @@ def preprocess_for_bow(data, return_idxs=True, preprocessing=True, preproc_param
         
     else:
         finaldata['text'] = text
+        finaldata['ids']=idxs
         return finaldata
 
 
@@ -153,7 +154,7 @@ def remove_unicodes_with_min_count(text_list, min_count):
         to_remove.extend(list(np.unique(unicodes, return_counts=True)[0][idxs]))
     return list(set(to_remove)) #make unique
 
-def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=True,  verbs=True, adjectives=False, unicodes_to_remove=unicodes_to_remove):
+def preprocess(text, strip_brackets=False, keep_unicodes=True, add_adj_nn_pairs=True,  verbs=True, adjectives=True, unicodes_to_remove=unicodes_to_remove):
 
     global init_done
 

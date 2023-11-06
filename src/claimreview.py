@@ -14,7 +14,5 @@ for record in newlines[1:]:
 with open('claimreviews.csv', 'w') as fout:
     for i in data.keys():
         fout.write(i+','+data[i]+'\n')
-    #writer = csv.writer(fout, quoting=csv.QUOTE_ALL, quotechar='"')
-    #writer.writerow(data.keys())
-    #writer.writerows(zip(*data.values()))
+
 
