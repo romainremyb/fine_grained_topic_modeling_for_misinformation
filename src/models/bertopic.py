@@ -11,11 +11,10 @@ from sklearn.feature_extraction.text import CountVectorizer
 class BERTopicWrapper(AbstractModel):
     """https://github.com/MaartenGr/BERTopic/tree/master
     """
-    def __init__(self, docs, IDs, nb_topics=None, min_topic_size=6, umap_param={'n_neighbors': 15, 'n_components': 5},
+    def __init__(self, docs, IDs, nb_topics=None, top_words=10, min_topic_size=6, umap_param={'n_neighbors': 15, 'n_components': 5},
                     representation_model = None, custom_vectorizer=False, vectorizer_params = {
                         'strip_accents': None, 'stop_words': "english",
-                        'ngram_range': (1,2), 'min_df': None, 'max_df': None
-                    }): 
+                        'ngram_range': (1,2)}): 
                     #TODO set min_df as fraction of nb of docs
         super().__init__(None, IDs, None) 
         """docs : Union[str,List]
@@ -25,13 +24,11 @@ class BERTopicWrapper(AbstractModel):
         #TODO always pretrain with standard params ? vectorizer_params for update_topics ?
         self.vectorizer=CountVectorizer(strip_accents= vectorizer_params['strip_accents'],
                         stop_words= vectorizer_params['stop_words'],
-                        ngram_range= vectorizer_params['ngram_range'],
-                        min_df= vectorizer_params['min_df'],
-                        max_df= vectorizer_params['max_df']) 
+                        ngram_range= vectorizer_params['ngram_range']) 
         
         if custom_vectorizer==True:
             self.model=BERTopic(language = "english",
-                                top_n_words = 10,
+                                top_n_words = top_words,
                                 n_gram_range = (1, 1),
                                 min_topic_size = min_topic_size,
                                 nr_topics = nb_topics,
@@ -48,7 +45,7 @@ class BERTopicWrapper(AbstractModel):
                                 representation_model = representation_model)
         else:
             self.model=BERTopic(language = "english",
-                                top_n_words = 10,
+                                top_n_words = top_words,
                                 n_gram_range = (1, 1),
                                 min_topic_size = min_topic_size,
                                 nr_topics = nb_topics,
