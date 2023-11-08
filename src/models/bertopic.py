@@ -1,11 +1,13 @@
 from .abstract_model import AbstractModel
 import numpy as np
+import pandas as pd
 import os, nltk
 from umap import UMAP
 from gensim.models import LdaModel, LdaMulticore
 from collections import defaultdict
 from utils import preprocess_for_bow, preprocess
 from bertopic import BERTopic
+from bertopic.backend._utils import select_backend
 from sklearn.feature_extraction.text import CountVectorizer
 
 class BERTopicWrapper(AbstractModel):
@@ -14,7 +16,7 @@ class BERTopicWrapper(AbstractModel):
     def __init__(self, docs, IDs, nb_topics=None, top_words=10, min_topic_size=6, umap_param={'n_neighbors': 15, 'n_components': 5},
                     representation_model = None, custom_vectorizer=False, vectorizer_params = {
                         'strip_accents': None, 'stop_words': "english",
-                        'ngram_range': (1,2)}): 
+                        'ngram_range': (1,2)}, embedding_model= None): 
                     #TODO set min_df as fraction of nb of docs
         super().__init__(None, IDs, None) 
         """docs : Union[str,List]
@@ -34,7 +36,7 @@ class BERTopicWrapper(AbstractModel):
                                 nr_topics = nb_topics,
                                 low_memory = False,
                                 calculate_probabilities = False,
-                                embedding_model = None, #if None and no embedding provided in fit()/fit_transform(), will use sentence_transformers.SentenceTransformer
+                                embedding_model = embedding_model, #if None and no embedding provided in fit()/fit_transform(), will use sentence_transformers.SentenceTransformer
                                 vectorizer_model = self.vectorizer, # 
                                 umap_model = UMAP(n_neighbors=umap_param['n_neighbors'],
                                                 n_components=umap_param['n_components'],
@@ -51,7 +53,7 @@ class BERTopicWrapper(AbstractModel):
                                 nr_topics = nb_topics,
                                 low_memory = False,
                                 calculate_probabilities = False,
-                                embedding_model = None, #if None and no embedding provided in fit()/fit_transform(), will use sentence_transformers.SentenceTransformer
+                                embedding_model = embedding_model, #if None -> sentence_transformers.SentenceTransformer
                                 vectorizer_model = None, 
                                 umap_model = UMAP(n_neighbors=umap_param['n_neighbors'],
                                                 n_components=umap_param['n_components'],
@@ -66,13 +68,10 @@ class BERTopicWrapper(AbstractModel):
                 raise ValueError('wrong datapath')
             else:
                 data = preprocess_for_bow('data.csv', preprocessing=False)
-                self.text = data['text']
-                self.ids = data['ids']
-
-        
-
-
-
-
+                self.text = data['text'][1:]
+                self.ids = data['ids'][1:]
+        else:
+            self.text = docs
+            self.ids = IDs
 
         

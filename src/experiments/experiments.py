@@ -50,6 +50,7 @@ lftm_param={'num_topics': [7, 10], 'alpha': [0.075,0.15,0.225], 'beta': [0.075,0
 
 
 def min_max(x, min, max): return min if x < min else max if x > max else x
+
 def gen_kappa (): return min_max(abs(random.normal(loc=1, scale=0.1)), 1, 1.2)
 def gen_K (): return min_max(int(abs(random.normal(loc=15, scale=7.5))), 10, 30)
 def gen_T (): return min_max(int(abs(random.normal(loc=150, scale=35))), 100, 200)
@@ -58,6 +59,11 @@ def gen_eta (): return min_max(abs(random.normal(loc=0.01, scale=0.025)), 0.01, 
 
 def gen_hdp_param(): return {'kappa': gen_kappa(), 'K': gen_K(), 'T': gen_T(),
            'alpha': gen_alpha_gamma(), 'gamma': gen_alpha_gamma(), 'eta': gen_eta()}
+
+def gen_nb_t(): return random.randint(7,12)
+def alpha_beta (): return min_max(random.normal(loc=0.15, scale=0.075), 0.05, 0.25)
+def _lambda (): return min_max(random.normal(loc=0.75, scale=0.1), 0.6, 0.9)
+def gen_lftm_param (): return {'num_topics': gen_nb_t(), 'alpha': alpha_beta(), 'beta': alpha_beta(), '_lambda': _lambda()}
 
 data = preprocess_for_bow('data.csv')
 
@@ -135,14 +141,14 @@ def gsdmm_experiment(data):
     return experiment
 
 
-def lftm_experiment(datapath):
+def lftm_experiment(datapath, n=20):
     experiment=dict()
     i=0
     print('running lftm experiment')
-    print(f"{len(combine(lftm_param))} experimentations to make")
-    for params in combine(lftm_param):
+    print(f"{n} experimentations to make")
+    for i in range(n):
         results = experiment_result.copy()
-        param_set = dict(zip(list(lftm_param.keys()), params))
+        param_set = gen_lftm_param()
         results['number_topics']=param_set['num_topics']
         results['hyperparameters']=param_set
         model=LFTMwrapper(datapath, num_topics=param_set['num_topics'], alpha=param_set['alpha'], 
