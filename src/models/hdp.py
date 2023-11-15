@@ -10,6 +10,7 @@ from utils import preprocess_for_bow, preprocess
 def get_indexes(topics_pred, threshold):
     return [(i, topics_pred[i]) for i in np.where(topics_pred>threshold)[0]]
 
+
 class HDPwrapper(AbstractModel):
     def __init__(self, bow_corpus, id2word, kappa=1.0, K=15, T=150,
                 alpha=1, gamma=1, eta=0.01): 
@@ -34,7 +35,6 @@ class HDPwrapper(AbstractModel):
         
         self.num_topics=self.max_topics()
         
-
     def predict_rawtext(self, text, minimum_probability=0, preprocessing=True, 
                         preproc_params = {'keep_unicodes': {'keep': True, 'min_count_in_corpus': 2}, 'strip_brackets': False, 
                                           'add_adj_nn_pairs': True, 'verbs': True, 'adjectives': False}):

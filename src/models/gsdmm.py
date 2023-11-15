@@ -106,7 +106,7 @@ class MovieGroupProcessWrapper(AbstractModel):
             current_words = []
             current_freq = []
             total = sum(topic.values())
-            for word, freq in sorted(topic.items(), key=lambda item: item[1], reverse=True)[:topn]:
+            for word, freq in sorted(topic.items(), key=lambda item: item[1], reverse=True): #[:topn]
                 current_words.append(self.id2word[word[0]])
                 current_freq.append(freq / total)
             if len(current_words)>0:

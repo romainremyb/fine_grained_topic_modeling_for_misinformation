@@ -119,8 +119,8 @@ def preprocess_for_bow(data, return_idxs=True, preprocessing=True, preproc_param
             return finaldata
         
     else:
-        finaldata['text'] = text
-        finaldata['ids']=idxs
+        finaldata['text'] = text[1:]
+        finaldata['ids']=idxs[1:]
         return finaldata
 
 
