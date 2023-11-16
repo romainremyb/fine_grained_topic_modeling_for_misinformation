@@ -84,12 +84,17 @@ class BERTopicWrapper(BERTopic):
         #self.normalized_dot_dist =  1 - (self.dot_product_scores / (np.linalg.norm(self.umap_embeddings, axis=1)[:, np.newaxis] * np.linalg.norm(self.umap_embeddings, axis=1)))
 
 
+#TODO: create tf-idf representation for each doc to cluster 
+# ctfidf_embedding useless
     def set_topics(self, list_topic_str, top_n, min_sim):
         """
-        -> find possible docs belonging to topic labels -> aimed to generate new centroids
+        -> uses built-in find_topics() method to retrieve possible topic clusters from input labels.
+            * the model computes the SBERT (by default, backends to other models exist) embedding of the label and scores with topic_embeddings_ fields
+            * topic_embeddings_ fields: average of document embeddings within clusters (note: embeddings are taken without dimensionality reduction)
+
         returns self.topics_set_embeddings -> list of input topic labels containing:
                                 - sbert_embedding: weighted average (on cosine similarity) of retrieved documents' embeddings - to be used as centroid
-                                - ctfidf_embedding: weighted average (on cosine similarity) of retrieved documents' embeddings - to be used as centroid 
+                                - ctfidf_embedding: weighted average (on cosine similarity) of retrieved clusters' embeddings - only one common c-tf-idf representation to all docs in cluster -> use tf-idf if want to score distances using bow metric
                                 - topic_labels
                                 - topic_idxs: doc idxs that were retrieved
 
@@ -106,18 +111,21 @@ class BERTopicWrapper(BERTopic):
             ctfidf_embedding=np.zeros(self.c_tf_idf_.shape[1])
             topics_found = self.find_topics(topic_name, top_n=top_n)
             topic_idxs=[]
+            idxs=[]
             for i in range(len(topics_found[0])):
                 if topics_found[1][i]<min_sim:
                     continue
                 topic_idxs.append(topics_found[0][i])
-                idxs = [j for j in range(len(self.topics_)) if self.topics_[j]==topics_found[0][i]] 
+                idx = [j for j in range(len(self.topics_)) if self.topics_[j]==topics_found[0][i]] 
+                idxs.extend(idx)
                 totalweight += topics_found[1][i]
-                sbert_embedding = sbert_embedding + topics_found[1][i]*self.umap_embeddings[idxs].sum(axis=0)/len(idxs) 
-            ctfidf_embedding = ctfidf_embedding + topics_found[1][i]*self.c_tf_idf_[topics_found[0][i]].toarray().sum(axis=0)
+                sbert_embedding = sbert_embedding + topics_found[1][i]*self.umap_embeddings[idx].sum(axis=0)/len(idx) 
+                ctfidf_embedding = ctfidf_embedding + topics_found[1][i]*self.c_tf_idf_[i].toarray().sum(axis=0)/len(idx) 
+
             sbert_embedding = sbert_embedding/totalweight
             ctfidf_embedding = ctfidf_embedding/totalweight
             self.topics_set_mapper[topic_name] = c
-            self.topics_set_embeddings.append({'sbert_embedding': sbert_embedding, 'ctfidf_embedding': ctfidf_embedding,
+            self.topics_set_embeddings.append({'topic_title': topic_name, 'sbert_embedding': sbert_embedding, 'ctfidf_embedding': ctfidf_embedding,
                                                'topic_labels': topic_idxs, 'topic_idxs': idxs}) 
             c+=1
             
@@ -143,32 +151,8 @@ class BERTopicWrapper(BERTopic):
             best = np.argmin(topic_norms)
             topics.append(best)
         self.sbert_clusters = np.array(topics)
-        self.sbert_centroids=centroids
+        self.sbert_centroids = centroids
         self.sbert_distances = np.linalg.norm(self.umap_embeddings - self.sbert_centroids[self.sbert_clusters], axis=1)
-
-
-    def ctfidf_cluster_set_topics(self):
-        """ Uses ctfidf centroids in self.topics_set_embeddings to recluster the corpus
-        returns:
-                - ctfidf_clusters: array containing topic labels (shape=len(corpus)), labels range(0,len(input labels))
-                - ctfidf_centroids: sbert_centroids matrix shape(len(input_labels), len(ctfidf_embedding))
-                - ctfidf_distances: norm distance of documents to their closest centroid ( shape=(len(corpus)) )
-        """
-        centroids = np.array([self.topics_set_embeddings[0]['ctfidf_embedding']]) 
-        for i in range(1, len(self.topics_set_embeddings)): # create set topic embedding matrix
-            centroids=np.vstack((centroids,self.topics_set_embeddings[i]['ctfidf_embedding']))
-
-        topics=[]
-        for i in range(self.c_tf_idf_.shape[0]):
-            topic_norms = []
-            for j in range(len(centroids)):        
-                norm = np.linalg.norm(self.c_tf_idf_[i,:].toarray()-centroids[j,:])
-                topic_norms.append(norm)
-            best = np.argmin(topic_norms)
-            topics.append(best)
-        self.ctfidf_clusters = np.array(topics)
-        self.ctfidf_centroids=centroids
-        self.ctfidf_distances = np.linalg.norm(self.c_tf_idf_.toarray() - self.ctfidf_centroids[self.ctfidf_clusters], axis=1)
 
 
 
@@ -185,8 +169,8 @@ class BERTopicWrapper(BERTopic):
 
 
     def get_sbert_norm_outliers(self, d_threshold): 
-        """
-        returns: List of List of doc idxs where ctfidf-distance to input label centroid is above a z-threshold 
+        """ error in sign it does not remove outliers but returns idxs with similarity above threshold
+        returns: List of List of doc idxs where sbert-distance to input label centroid is above a distance-threshold 
         """
         outliers_idx = []
         for i in range(len(self.sbert_centroids)):
@@ -194,6 +178,7 @@ class BERTopicWrapper(BERTopic):
             outliers_idx.append(idxs[np.where(np.abs(self.sbert_distances[idxs]) > abs(d_threshold))[0].tolist()].tolist())
         return outliers_idx
     
+
 
 
 
