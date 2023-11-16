@@ -158,6 +158,8 @@ class BERTopicWrapper(BERTopic):
 
     def get_sbert_z_outliers(self, z_threshold): 
         """
+        NOTE DONT USE: problem of using it -> not normally distributed -> mean is not centroid...
+
         returns: List of List of doc idxs where sbert-distance to input label centroid is above a z-threshold 
         """
         outliers_idx = []
@@ -169,8 +171,8 @@ class BERTopicWrapper(BERTopic):
 
 
     def get_sbert_norm_outliers(self, d_threshold): 
-        """ error in sign it does not remove outliers but returns idxs with similarity above threshold
-        returns: List of List of doc idxs where sbert-distance to input label centroid is above a distance-threshold 
+        """ 
+        returns: List of List of doc idxs where sbert-distance to input label centroid is above a norm distance-threshold 
         """
         outliers_idx = []
         for i in range(len(self.sbert_centroids)):
@@ -179,7 +181,16 @@ class BERTopicWrapper(BERTopic):
         return outliers_idx
     
 
-
+    def get_sbert_cosim_outliers(self, d_threshold): 
+        """ 
+        returns: List of List of doc idxs where sbert-distance to input label centroid is above a cosine-similarity distance-threshold 
+        """
+        outliers_idx = []
+        for i in range(len(self.sbert_centroids)):
+            idxs = np.where(np.array(self.sbert_clusters)==i)[0] # indexes of topic i
+            cosim = cosine_similarity(self.umap_embeddings[idxs], self.sbert_centroids[i].reshape(-1,1).T).flatten()
+            outliers_idx.append(idxs[np.where(np.abs(cosim) > abs(d_threshold))[0].tolist()].tolist())
+        return outliers_idx
 
 
 
